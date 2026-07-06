@@ -1,0 +1,61 @@
+version: 2
+
+models:
+  - name: trial_balance_by_month
+    description: "Trial balance by month — debits and credits per account per month. Correctness invariant: total debits = total credits per month."
+    columns:
+      - name: month
+        description: "Reporting month (first day of month)"
+        tests:
+          - not_null
+      - name: account_id
+        description: "Account identifier"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_account')
+              field: account_id
+      - name: account_name
+        description: "Human-readable account name from chart of accounts"
+      - name: account_class
+        description: "Account classification (Assets, Liabilities, Equity, Revenue, Expenses)"
+      - name: total_debit
+        description: "Sum of debits for this account in this month"
+        tests:
+          - not_null
+      - name: total_credit
+        description: "Sum of credits for this account in this month"
+        tests:
+          - not_null
+      - name: net_amount
+        description: "total_debit - total_credit"
+        tests:
+          - not_null
+
+  - name: income_statement_by_month
+    description: "Income statement by month — revenue, expenses, and net income for P&L accounts. Correctness invariant: revenue + expenses = net income per month."
+    columns:
+      - name: month
+        description: "Reporting month (first day of month)"
+        tests:
+          - not_null
+      - name: line_type
+        description: "Income statement line classification (Revenue, Operating Expense, Interest Expense)"
+        tests:
+          - not_null
+      - name: account_class
+        description: "Account class from chart of accounts"
+        tests:
+          - not_null
+      - name: amount
+        description: "Net amount for this classification in this month"
+        tests:
+          - not_null
+      - name: revenue
+        description: "Revenue amount (0 for expense rows)"
+        tests:
+          - not_null
+      - name: expenses
+        description: "Expense amount (0 for revenue rows)"
+        tests:
+          - not_null

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "pipeline-mcp": {
+      "command": "python",
+      "args": [
+        "/home/roy/repos/airflow-agent-framework/mcp/pipeline-mcp/server.py"
+      ]
+    }
+  }
+}

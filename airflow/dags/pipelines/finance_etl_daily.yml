@@ -1,0 +1,53 @@
+# ============================================
+# Pipeline config: finance_etl_daily
+# Source of truth for the finance_etl_daily DAG.
+# DO NOT hand-edit the generated DAG file — edit this YAML and re-run render_dag.py.
+# ============================================
+
+dag_id: finance_etl_daily
+description: "Daily GL transactions ETL: extract via API → load Postgres → dbt run → dbt test"
+schedule: "@daily"
+start_date: "2024-01-01"
+catchup: false
+tags: [finance, etl, dbt, gl]
+max_active_runs: 1
+
+default_args:
+  owner: data-eng
+  retries: 3
+  retry_delay_minutes: 2
+  retry_exponential_backoff: true
+  max_retry_delay_minutes: 30
+  execution_timeout_minutes: 30
+
+stages:
+  # --- Extract/Load: PythonOperator that pulls from FastAPI and upserts to Postgres ---
+  - id: extract_load
+    type: python_callable       # special: uses the load function
+    sla_minutes: 30
+    doc: "Fetch GL transactions from FastAPI, upsert into finance.gl_transactions via PostgresHook."
+
+  # --- dbt base: full run of all models (staging → refined → marts) ---
+  - id: dbt_run_all
+    type: dbt_run               # bare dbt run
+    sla_minutes: 60
+    doc: "Run all dbt models (staging → refined → marts)."
+
+  # --- dbt test: validate data quality across all models ---
+  - id: dbt_test_all
+    type: dbt_test
+    sla_minutes: 30
+    doc: "Run all dbt tests to validate data quality."
+
+  # --- Marts: one BashOperator per model, chained in listed order ---
+  # Rebuilt in sequence so reporting marts build after the base models refresh.
+  - id: marts
+    type: dbt_model             # one task per model, auto-chained
+    models:
+      - trial_balance_by_month
+      - income_statement_by_month
+      - balance_sheet_by_month
+      - gross_profit_mom_variance
+      - account_aging
+    sla_minutes: 15
+    doc_template: "Rebuild the {model} mart (generated artifact)."

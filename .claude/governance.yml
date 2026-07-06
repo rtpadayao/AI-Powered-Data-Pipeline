@@ -1,0 +1,30 @@
+# Pipeline governance policy (Phase 3, Pillar 1).
+#
+# This is the policy the `pipeline-governance` agent enforces, read by the
+# `governance_check` / `governance_submit` / `airflow_trigger` tools in
+# `mcp/pipeline-mcp/server.py`. It is the lightweight version of the blueprint's
+# "access / blast-radius control" (heavier PII-tagging + prod/dev RBAC are
+# deferred — `sensitive:` below is surfaced in reports but not yet enforced).
+#
+# Definitions:
+#   requires_approval     High blast-radius models. The change-approval gate
+#                         refuses to promote (airflow_trigger) a DAG that runs
+#                         these without a satisfied handoff-2 signoff on file.
+#   sensitive             Surfaced in blast-radius reports only. No enforcement
+#                         yet (deferred Pillar-C).
+#   required_validations  Checks that must read "pass" in the handoff-2 report for
+#                         any artifact's signoff to count as satisfied.
+
+requires_approval:
+  - normalize
+  - account_balances
+
+sensitive:
+  - account_aging
+
+required_validations:
+  - dbt_compile
+  - dbt_run
+  - balance_check
+  - dag_wiring
+  - api_endpoint

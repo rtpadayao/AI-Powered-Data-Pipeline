@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: stg_gl_transactions
+    description: "Staging model for general ledger transactions. Cleans and prepares raw transaction data."
+    columns:
+      - name: transaction_id
+        description: "Unique identifier for the transaction (maps to entry_no in source)"
+        tests:
+          - not_null
+          - unique
+      - name: transaction_date
+        description: "Date of the transaction"
+        tests:
+          - not_null
+      - name: territory_key
+        description: "Territory identifier"
+      - name: account_id
+        description: "Foreign key to the chart of accounts (maps to account_key in source)"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_account')
+              field: account_id
+      - name: details
+        description: "Transaction description"
+      - name: debit
+        description: "Debit amount"
+        tests:
+          - not_null
+      - name: credit
+        description: "Credit amount"
+        tests:
+          - not_null

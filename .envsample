@@ -1,0 +1,30 @@
+# PostgreSQL Configuration
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=POSTGRES_PASSWORD
+POSTGRES_DB=DATABASE
+
+# pgAdmin Configuration
+PGADMIN_DEFAULT_EMAIL=PGADMIEMAIL
+PGADMIN_DEFAULT_PASSWORD=PGADMINPASSWORD
+
+# Airflow Configuration
+# Database connection for Airflow metadata DB
+DB_USER=postgres
+DB_PASSWORD=POSTGRES_PASSWORD
+DB_NAME=DATABASE
+# Fernet key for encrypting sensitive data in Airflow
+AIRFLOW_FERNET_KEY=0987456KEY
+# Secret key for Airflow webserver session security
+AIRFLOW_SECRET_KEY=<REDUCTED>
+# Admin user for Airflow UI
+AIRFLOW_ADMIN_USER=ADMIN
+AIRFLOW_ADMIN_PASSWORD=ADMIN
+AIRFLOW_ADMIN_EMAIL=email@example.com
+
+# FastAPI Configuration
+APP_ENV=fastapi
+# FASTAPI_BUILD_TARGET can be development or production
+FASTAPI_BUILD_TARGET=fastapi
+
+# dbt Configuration
+DBT_SCHEMA=private

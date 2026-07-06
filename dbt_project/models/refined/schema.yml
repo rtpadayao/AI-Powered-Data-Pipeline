@@ -1,0 +1,96 @@
+version: 2
+
+models:
+  - name: dim_account
+    description: "Dimension table for chart of accounts, providing hierarchical account structure."
+    columns:
+      - name: account_id
+        description: "Primary key for the account"
+        tests:
+          - not_null
+          - unique
+      - name: Report
+        description: "Financial statement classification (e.g., Balance Sheet, Income Statement)"
+        quote: true
+        tests:
+          - not_null
+      - name: Class
+        description: "Broad category of account (e.g., Assets, Liabilities, Equity, Revenue, Expenses)"
+        quote: true
+        tests:
+          - not_null
+      - name: SubClass
+        description: "Sub-classification within the class"
+        quote: true
+      - name: SubClass2
+        description: "Further sub-classification"
+        quote: true
+      - name: account_name
+        description: "Name of the account"
+        tests:
+          - not_null
+      - name: sub_account_name
+        description: "Sub-account name (if applicable)"
+  - name: dim_date
+    description: "Date dimension table for transaction dates."
+    columns:
+      - name: date_id
+        description: "Date as primary key"
+        tests:
+          - not_null
+          - unique
+      - name: year
+        description: "Year component of the date"
+        tests:
+          - not_null
+      - name: month
+        description: "Month component of the date (1-12)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1,2,3,4,5,6,7,8,9,10,11,12]
+      - name: day
+        description: "Day component of the date (1-31)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
+      - name: month_year
+        description: "Month and year in text format (e.g., 'Jan 2023')"
+      - name: is_weekend
+        description: "Flag indicating if the date is a weekend (Saturday or Sunday)"
+  - name: fact_gl_transactions
+    description: "Refined fact table for general ledger transactions. Carries the raw debit/credit split plus a precomputed amount (debit - credit); marts.normalize applies the account-type sign rule."
+    columns:
+      - name: transaction_id
+        description: "Primary key for the transaction (maps to entry_no in source)"
+        tests:
+          - not_null
+          - unique
+      - name: transaction_date
+        description: "Date of the transaction"
+        tests:
+          - not_null
+      - name: territory_key
+        description: "Territory identifier"
+      - name: account_id
+        description: "Foreign key to the account dimension"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_account')
+              field: account_id
+      - name: details
+        description: "Transaction description"
+      - name: debit
+        description: "Debit amount"
+        tests:
+          - not_null
+      - name: credit
+        description: "Credit amount"
+        tests:
+          - not_null
+      - name: amount
+        description: "Precomputed amount = debit - credit (sign rule applied later in marts.normalize)"
+        tests:
+          - not_null

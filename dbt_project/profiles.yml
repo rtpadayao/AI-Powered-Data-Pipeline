@@ -1,0 +1,25 @@
+# ============================================
+# dbt Profiles Configuration
+# Purpose: Database connection for dbt transformations
+# ============================================
+
+default:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: postgres
+      user: "{{ env_var('DBT_DB_USER', 'postgres') }}"
+      password: "{{ env_var('DBT_DB_PASS', '123learn') }}"
+      port: "{{ env_var('DBT_DB_PORT', '5432') | int }}"
+      dbname: "{{ env_var('DBT_DB_NAME', 'finance_demo') }}"
+      schema: "{{ env_var('DBT_DB_SCHEMA', 'public') }}"
+
+    prod:
+      type: postgres
+      host: "{{ env_var('DBT_DB_HOST') }}"
+      user: "{{ env_var('DBT_DB_USER') }}"
+      password: "{{ env_var('DBT_DB_PASS') }}"
+      port: "{{ env_var('DBT_DB_PORT', '5432') | int }}"
+      dbname: "{{ env_var('DBT_DB_NAME') }}"
+      schema: "{{ env_var('DBT_DB_SCHEMA', 'public') }}"
