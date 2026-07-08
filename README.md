@@ -1,250 +1,113 @@
-# AI-Powered Airflow Data Pipeline
+# Financial Data Platform
 
-A robust, automated data pipeline that leverages Airflow for orchestration, dbt for transformation, and FastAPI for both data ingestion (as a validation gateway) and data serving, with AI-powered enhancements for data quality, monitoring, and optimization.
+An end-to-end data pipeline that ingests multi-source financial data, transforms it through a layered warehouse architecture, and serves it via a secure API for business intelligence consumption.
 
-## 📋 Overview
+Built for production. Designed to scale.
 
-This project implements a modern data platform using industry-standard tools:
-- **Apache Airflow**: Workflow orchestration and scheduling
-- **dbt (data build tool)**: Data transformation and testing
-- **FastAPI**: High-performance API for data serving
-- **PostgreSQL**: Reliable data storage
-- **Claude Code**: AI-powered development assistance with custom agents and skills
+---
 
-The pipeline follows a layered architecture where data flows: Sources → FastAPI (Ingestion Gateway for validation/authentication) → PostgreSQL → dbt (staging → refined → marts transformation layers) → FastAPI (Serving Layer for consuming transformed data) → Power BI/Other Consumers, ensuring data quality, traceability, and scalability.
+## Architecture Overview
 
-## 🏗️ Project Structure
+![Architecture Overview](docs/architecture_overview.svg)
 
-```
-ai-powered-airflow/
-├── .claude/                 # Claude Code customizations (agents, commands, rules, skills)
-├── airflow/                 # Orchestration layer (DAGs, logs, plugins)
-├── api/                     # FastAPI service for data delivery
-├── dbt_project/             # dbt transformation project (staging/refined/marts)
-├── infrastructure/          # Database initialization and raw data storage
-├── notebooks/               # Exploratory data analysis and profiling
-├── docker-compose.yml       # Service orchestration
-├── .env                     # Environment variables
-├── CLAUDE.md                # Project setup and development guidance
-├── project_roadmap.md       # Planned features and milestones
-├── decisions.md             # Architectural decision log
-├── housekeeper.md           # Project cleanup and organization guidelines
-└── dependency-manager.md    # Dependency management guidelines
-```
+**Data flow:** Sources → Ingestion & Validation (FastAPI) → Staging (Postgres) → Transformation (dbt: staging → refined → marts) → Serving Layer (FastAPI) → BI Tools
 
-## 🚀 Quick Start
+**Orchestration:** Airflow schedules and monitors the entire pipeline with retry logic, SLAs, and failure handling.
 
-### 1. Environment Setup
+---
+
+## What I Built
+
+### 1. Pluggable Ingestion Layer
+- **Adapter pattern** (`api/adapters/base.py`) allows the pipeline to ingest from any source — CSV, PDF, Excel, REST API, or database — without modifying core pipeline code.
+- Each adapter validates schema, transforms rows to a common financial ledger format, and reports lineage metadata.
+- This means a new data source can be onboarded in hours, not days.
+
+### 2. Dual-Role FastAPI Service
+- **Ingestion Gateway:** Validates, authenticates, and preprocesses incoming data before it touches the database. Rate-limited and secured with security headers.
+- **Serving Layer:** Exposes dbt-transformed marts (trial balance, P&L, balance sheet, MoM variance) to BI tools via clean REST endpoints with pagination.
+
+### 3. dbt Data Warehouse (Medallion Architecture)
+- **Staging:** Source-centric views that clean and type-cast raw data. Lightweight — always reflects the latest source data.
+- **Refined:** Business rules, slowly-changing dimensions (SCD-ready `dim_account`, `dim_date`), and the core fact table (`fact_gl_transactions`). Materialized incrementally for performance.
+- **Marts:** Domain-ready analytical models — `trial_balance_by_month`, `income_statement_by_month`, `balance_sheet_by_month`, `gross_profit_mom_variance`, `account_aging`.
+
+### 4. Airflow Orchestration
+- Daily DAG (`finance_etl_daily`) orchestrates extract → load → dbt run → dbt test → mart rebuild.
+- Config-driven: DAG is generated from YAML, making schedule and task logic version-controlled and readable.
+- Built-in resilience: retries with exponential backoff, skip-on-empty logic, and SLA monitoring.
+
+### 5. AI-Powered Natural Language Interface
+- `/ask` endpoint converts plain-English financial questions into read-only SQL queries.
+- Read-only guard prevents destructive operations. Schema primer ensures the LLM understands the warehouse structure.
+- Complex questions escalate to an LLM agent for deeper reasoning.
+
+---
+
+## Technology Stack
+
+| Layer | Tool | Why |
+|---|---|---|
+| Orchestration | Apache Airflow | Industry standard for DAG scheduling, retries, and observability |
+| Transformation | dbt | SQL-first transformations with testing, documentation, and lineage |
+| API | FastAPI | Async, auto-documented, type-safe Python API |
+| Database | PostgreSQL | Reliable, open-source, excellent analytical query performance |
+| Containerization | Docker & Docker Compose | One-command local setup, consistent environments |
+| AI Integration | Claude Code / LLM agents | Natural language interface, code generation, and agent orchestration |
+
+---
+
+## Key Design Decisions
+
+### Why the adapter pattern for ingestion?
+Businesses accumulate data from multiple systems over time. Hard-coding connectors means rewrites every time a new source appears. The adapter pattern abstracts extraction so the pipeline core remains stable while sources change.
+
+### Why incremental materializations for refined and marts?
+Financial data grows. Rebuilding the entire warehouse every run is inefficient and expensive. Incremental models only process changed data, keeping runtime and cost predictable.
+
+### Why FastAPI for both ingestion and serving?
+A single API surface reduces operational overhead. The ingestion path enforces schema and validation Tribuna at the boundary. The serving path exposes only curated marts, preventing BI tools from querying raw or intermediate tables directly.
+
+### How are failures handled?
+- Empty API responses skip the dbt run (no wasted compute).
+- Airflow retries failed tasks with exponential backoff.
+- dbt tests catch data quality issues before marts are rebuilt.
+- Postgres transactions ensure atomic loads — no partial data.
+
+---
+
+## Reproduction Steps
+
 ```bash
-# Copy environment variables (if needed)
-cp .env.example .env  # if .env.example exists
-# Edit .env with your credentials
-```
-
-### 2. Start the Full Stack
-```bash
+# 1. Clone and start the stack
 docker compose up -d
+
+# 2. Verify all services are healthy
+docker compose ps
+
+# 3. Trigger the pipeline manually
+docker compose exec airflow-webserver airflow dags trigger finance_etl_daily
+
+# 4. Access services
+# Airflow UI:    http://localhost:8081
+# FastAPI docs:  http://localhost:8000/docs
+# pgAdmin:       http://localhost:5050
 ```
 
-### 3. Access Services
-- **Airflow UI**: http://localhost:8080
-- **pgAdmin**: http://localhost:5050 (credentials from .env)
-- **FastAPI**: http://localhost:8000 (if built for development)
-- **Postgres**: localhost:5432 (internal only; use pgAdmin or add port mapping in compose for direct access)
+---
 
-## 🔧 Development Workflow
+## What This Demonstrates
 
-### Airflow
-- DAGs are located in `airflow/dags/`
-- Mounted into the container; changes appear immediately in the webserver (if containers are restarted or touch the file to trigger reload)
-- To develop a new DAG:
-  1. Add Python file to `airflow/dags/`
-  2. Restart the webserver/scheduler or touch the file to trigger a reload:
-     ```bash
-     docker compose restart airflow-webserver airflow-scheduler
-     ```
-  3. View logs:
-     ```bash
-     docker compose logs -f airflow-webserver
-     docker compose logs -f airflow-scheduler
-     ```
+- **System design:** Building composable, production-ready data systems
+- **Software engineering:** Clean abstractions (adapters), separation of concerns, type safety
+- **Data engineering:** ETL/ELT pipelines, dimensional modeling, incremental processing
+- **DevOps:** Docker, container orchestration, health checks, environment management
+- **AI integration:** LLM-powered interfaces with safety guards and schema awareness
 
-### dbt (Data Transformation)
-- dbt project lives in `dbt/project/` (mounted into the dbt service)
-- Profiles are in `dbt/profiles.yml` (mounted read-only)
-- Commands are run via `docker compose run --rm dbt <command>`
-- Common dbt workflow:
-  - Build models: `docker compose run --rm dbt run`
-  - Test models: `docker compose run --rm dbt test`
-  - Generate docs: `docker compose run --rm dbt docs generate`
-  - Seed data: `docker compose run --rm dbt seed`
-  - Run specific models: `docker compose run --rm dbt run --models <model_name>`
-- dbt models are organized in layers:
-  - `staging/`: source-centric, cleaned data
-  - `refined/`: business rules, master data
-  - `marts/`: domain-centric, ready for consumption
+---
 
-### FastAPI
-- The API service serves a dual role in the pipeline:
-  1. **Ingestion Gateway**: Validates, authenticates, and preprocesses incoming data before it lands in PostgreSQL (used by `extract_load.py`)
-  2. **Serving Layer**: Provides access to dbt-transformed data for consumption by tools like Power BI
-- The API service is defined in `api/` (note: docker-compose references `./fastapi` which may be a symlink or misconfiguration; adjust as needed)
-- Current entrypoint: `api/main.py` contains both:
-  - An ingestion endpoint (`/transactions/raw`) used by `extract_load.py` to fetch and validate data
-  - Serving endpoints (`/transactions/marts/*`, `/transactions/refined/*`) for accessing dbt-transformed data
-- To run the API locally (outside Docker) for development:
-  ```bash
-  # Install dependencies
-  pip install -r api/requirements.txt  # if exists, otherwise install fastapi, uvicorn, etc.
-  
-  # Run the server
-  uvicorn api.main:app --reload  # assuming app instance named 'app' in main.py
-  ```
-- If using Docker development mode (as per compose):
-  ```bash
-  docker compose up fastapi  # builds with target: development and mounts ./fastapi:/app
-  ```
-- API endpoints should be defined in `api/main.py` or separate router files.
-- Validate requests with Pydantic schemas (see `api/schemas.py` if populated).
-- Use asynchronous HTTPX calls for external interactions.
+## Contact
 
-### Notebooks
-- Exploratory analysis lives in `notebooks/`
-- Jupyter notebooks can be run with:
-  ```bash
-  jupyter lab notebooks/
-  ```
-- Specific requirements for profiling are in `notebooks/requirements.txt`
+[[Email](padayao.roy@gmail.com)] | [[LinkedIn](www.linkedin.com/in/roytp)] | [[GitHub](https://github.com/rtpadayao)]
 
-## 🧪 Testing
-
-### Airflow
-- No specific test suite observed; validate DAGs by:
-  - Running `airflow dags test <dag_id> <execution_date>` inside the webserver/scheduler container
-  - Triggering DAGs via UI and checking logs
-
-### dbt
-- Tests are defined in `dbt/project/models/**/*_test.yml` or as schema tests
-- Run all tests:
-  ```bash
-  docker compose run --rm dbt test
-  ```
-- Run tests for a specific model:
-  ```bash
-  docker compose run --rm dbt test --models <model_name>
-  ```
-
-### FastAPI
-- If tests exist, they may be in `api/` or a `tests/` directory.
-- Run with pytest:
-  ```bash
-  pytest api/
-  ```
-  or
-  ```bash
-  pytest tests/
-  ```
-
-### General
-- Linting/formatting: if configured, use tools like `flake8`, `black`, `isort`. Check for config files (`.flake8`, `pyproject.toml`, etc.).
-- No general test command observed; run component-specific tests as above.
-
-## 📚 Key Configuration Files
-
-- `docker-compose.yml`: Defines all services, networks, volumes
-- `.env`: Environment variables for services (not committed; see `.env.example` if present)
-- `dbt/profiles.yml`: dbt connection profiles (mounted into dbt container)
-- `dbt/project/dbt_project.yml`: dbt project configuration
-
-## 🔄 Common Commands Reference
-
-| Purpose | Command |
-|---------|---------|
-| Start all services | `docker compose up -d` |
-| Stop all services | `docker compose down` |
-| View service logs | `docker compose logs -f <service_name>` |
-| Restart a service | `docker compose restart <service_name>` |
-| Run a one-off dbt command | `docker compose run --rm dbt <command>` |
-| Access Postgres CLI (if port exposed) | `psql -h localhost -U $DB_USER -d $DB_NAME` |
-| Access pgAdmin | Browse to http://localhost:5050 |
-| Trigger Airflow DAG via CLI | `docker compose exec airflow-webserver airflow dags trigger <dag_id>` |
-| List Airflow DAGs | `docker compose exec airflow-webserver airflow dags list` |
-| Run FastAPI tests | `pytest api/` |
-| Run dbt docs serve | `docker compose run --rm dbt docs serve` |
-
-## 📑 Documentation
-
-For detailed connection instructions, see:
-- [Power BI Connection Guide](docs/power_bi_connection.md) - Complete guide for connecting Power BI to the pipeline via direct PostgreSQL or FastAPI endpoints
-- [Pipeline Design Documentation](docs/pipeline_design.md) - Overview of standard and API-wrapper architectural patterns
-
-## 🤖 Claude Code Specifics
-
-This project includes custom Claude Code enhancements for improved development experience:
-
-### Agents
-Specialized subagents for domain-specific tasks:
-- `airflow-expert`: Airflow orchestration assistance
-- `api-developer`: FastAPI development guidance
-- `data-engineer`: Data engineering task support
-- `database-admin`: PostgreSQL administration and optimization
-- `dbt-specialist`: dbt transformation modeling
-- `housekeeper`: Project cleanup and organization recommendations
-- `dependency-manager`: Dependency management guidance
-- `markdown`: Markdown formatting and best practices
-
-### Commands
-Custom slash commands for common tasks:
-- `/run-pipeline`: Execute the full data pipeline
-- `/dbt-run`: Run dbt transformations with testing and documentation
-- `/airflow-test`: Test and validate Airflow DAGs
-- `/api-test`: Test FastAPI endpoint functionality and performance
-
-### Rules
-Path-specific lazy-loaded rules that provide guidance when editing files:
-- `.claude/rules/dbt.md`: Rules for SQL formatting and layering
-- `.claude/rules/airflow.md`: Rules for Airflow DAG development
-
-### Skills
-Specialized skills for extended functionality:
-- `docker`: Docker container management
-- `airflow`: Airflow-specific operations
-- `fastapi`: FastAPI development assistance
-- `dbt`: dbt transformation support
-- `postgres`: PostgreSQL administration
-
-## 📈 Features
-
-- **Modular Architecture**: Separation of concerns between ingestion, orchestration, transformation, and consumption
-- **Idempotency**: Pipeline tasks can be safely retried without side effects
-- **AI-Powered Enhancements**: Planned features for anomaly detection, self-healing pipelines, and dynamic resource allocation
-- **Comprehensive Testing**: Built-in validation at each layer of the pipeline
-- **Documentation**: Auto-generated API and dbt documentation
-- **Monitoring**: Hooks for integrating with observability tools
-- **Security**: Best practices for credential management and data protection
-
-## 📅 Roadmap
-
-See [project_roadmap.md](project_roadmap.md) for planned features, improvements, and milestones.
-
-## 📜 Decisions
-
-See [decisions.md](decisions.md) for architectural decision records documenting significant choices made during development.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a pull request
-
-## 📄 License
-
-[Specify your license here]
-
-## 🙏 Acknowledgments
-
-- The open-source communities behind Airflow, dbt, FastAPI, and PostgreSQL
-- Anthropic for Claude Code and its extensibility features
-- Contributors and users of this project
+Open to remote data engineering, analytics engineering, and backend engineering roles.
