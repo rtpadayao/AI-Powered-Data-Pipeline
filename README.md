@@ -108,6 +108,6 @@ docker compose exec airflow-webserver airflow dags trigger finance_etl_daily
 
 ## Contact
 
-[[Email](padayao.roy@gmail.com)] | [[LinkedIn](www.linkedin.com/in/roytp)] | [[GitHub](https://github.com/rtpadayao)]
+[padayao.roy@gmail.com] | [www.linkedin.com/in/roytp] | [https://github.com/rtpadayao]
 
 Open to remote data engineering, analytics engineering, and backend engineering roles.
